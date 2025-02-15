@@ -51,28 +51,6 @@ const initializeUserData = (msg) => {
 };
 
 const handleWalletRoutes = (bot) => {
-    // Wallet command
-    bot.onText(/\/wallet/, (msg) => {
-        const chatId = msg.chat.id;
-        const userId = msg.from.id.toString();
-        
-        // Initialize or update user data
-        let userData = getUserData(userId) || initializeUserData(msg);
-        userData.lastInteraction = new Date().toISOString();
-        saveUserData(userId, userData);
-
-        const options = {
-            reply_markup: {
-                inline_keyboard: [
-                    [{text: 'Create Solana Wallet', callback_data: 'create_wallet'}],
-                    [{text: 'View My Wallets', callback_data: 'view_wallets'}]
-                ]
-            }
-        };
-        
-        bot.sendMessage(chatId, 'Wallet Management Options:', options);
-    });
-
     // Handle callback queries
     bot.on('callback_query', async (callbackQuery) => {
         const chatId = callbackQuery.message.chat.id;
@@ -99,71 +77,30 @@ const handleWalletRoutes = (bot) => {
                         return;
                     }
 
+                    // Display list of wallets with numbers
+                    let walletList = 'Your Wallets:\n\n';
                     userData.wallets.forEach((wallet, index) => {
                         const publicKey = wallet.publicKey.replace('.json', '');
-                        const message = `Wallet #${index + 1}\n\n`
-                            + `<code>${publicKey}</code>\n\n`
-                            + `<code>${wallet.privateKey}</code>`;
-
-                        bot.sendMessage(chatId, message, {
-                            parse_mode: 'HTML',
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [
-                                        {text: 'Copy Public Key', callback_data: `copy_pub_${index}`},
-                                        {text: 'Copy Private Key', callback_data: `copy_priv_${index}`}
-                                    ]
-                                ]
-                            }
-                        });
+                        walletList += `${index + 1}. <code>${publicKey}</code>\n`;
                     });
+                    walletList += '\nEnter the number of the wallet to view its private key:';
+
+                    bot.sendMessage(chatId, walletList, {
+                        parse_mode: 'HTML'
+                    });
+
+                    // Set state to await wallet selection
+                    userStates[chatId] = { awaitingWalletSelection: true };
+
                 } catch (error) {
                     console.error('Error viewing wallets:', error);
                     bot.sendMessage(chatId, 'Error retrieving wallets. Please try again.');
                 }
                 break;
-
-            case callbackQuery.data.match(/^copy_pub_\d+/)?.[0]:
-                try {
-                    const index = parseInt(callbackQuery.data.split('_')[2]);
-                    const userData = getUserData(userId);
-                    if (userData && userData.wallets[index]) {
-                        await bot.answerCallbackQuery(callbackQuery.id, {
-                            text: 'Public key copied!',
-                            show_alert: true
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error copying public key:', error);
-                    await bot.answerCallbackQuery(callbackQuery.id, {
-                        text: 'Error copying key',
-                        show_alert: true
-                    });
-                }
-                break;
-
-            case callbackQuery.data.match(/^copy_priv_\d+/)?.[0]:
-                try {
-                    const index = parseInt(callbackQuery.data.split('_')[2]);
-                    const userData = getUserData(userId);
-                    if (userData && userData.wallets[index]) {
-                        await bot.answerCallbackQuery(callbackQuery.id, {
-                            text: 'Private key copied!',
-                            show_alert: true
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error copying private key:', error);
-                    await bot.answerCallbackQuery(callbackQuery.id, {
-                        text: 'Error copying key',
-                        show_alert: true
-                    });
-                }
-                break;
         }
     });
 
-    // Handle regular messages for prefix input
+    // Handle regular messages for prefix input and wallet selection
     bot.on('message', async (msg) => {
         const chatId = msg.chat.id;
         const userId = msg.from.id.toString();
@@ -211,15 +148,7 @@ const handleWalletRoutes = (bot) => {
                         await bot.editMessageText(message, {
                             chat_id: chatId,
                             message_id: processingMsg.message_id,
-                            parse_mode: 'HTML',
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [
-                                        {text: 'Copy Public Key', callback_data: `copy_pub_${userData.wallets.length - 1}`},
-                                        {text: 'Copy Private Key', callback_data: `copy_priv_${userData.wallets.length - 1}`}
-                                    ]
-                                ]
-                            }
+                            parse_mode: 'HTML'
                         });
 
                         try {
@@ -241,6 +170,39 @@ const handleWalletRoutes = (bot) => {
                     delete userStates[chatId];
                 }
             });
+        } else if (userStates[chatId]?.awaitingWalletSelection && msg.text && !msg.text.startsWith('/')) {
+            try {
+                const selectedNumber = parseInt(msg.text.trim());
+                const userData = getUserData(userId);
+
+                if (!userData || !userData.wallets) {
+                    bot.sendMessage(chatId, 'Error: No wallets found.');
+                    delete userStates[chatId];
+                    return;
+                }
+
+                if (isNaN(selectedNumber) || selectedNumber < 1 || selectedNumber > userData.wallets.length) {
+                    bot.sendMessage(chatId, `Please enter a valid number between 1 and ${userData.wallets.length}.`);
+                    return;
+                }
+
+                const selectedWallet = userData.wallets[selectedNumber - 1];
+                const message = `Selected Wallet #${selectedNumber}\n\n`
+                    + `Public Key:\n<code>${selectedWallet.publicKey.replace('.json', '')}</code>\n\n`
+                    + `Private Key:\n<code>${selectedWallet.privateKey}</code>`;
+
+                bot.sendMessage(chatId, message, {
+                    parse_mode: 'HTML'
+                });
+
+                // Clear selection state
+                delete userStates[chatId];
+
+            } catch (error) {
+                console.error('Error processing wallet selection:', error);
+                bot.sendMessage(chatId, 'Error retrieving wallet information. Please try again.');
+                delete userStates[chatId];
+            }
         }
     });
 };
