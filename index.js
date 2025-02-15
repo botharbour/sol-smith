@@ -5,10 +5,21 @@ require('dotenv').config();
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {polling: true});
 
 // Import routes
-const telegramRoutes = require('./routes/telegram');
+const handleTelegramRoutes = require('./routes/telegram');
+const handleWalletRoutes = require('./routes/wallet');
+
+// Create necessary directories
+const fs = require('fs');
+if (!fs.existsSync('./data')) {
+    fs.mkdirSync('./data');
+}
+if (!fs.existsSync('./keypairs')) {
+    fs.mkdirSync('./keypairs');
+}
 
 // Initialize routes
-telegramRoutes(bot);
+handleTelegramRoutes(bot);
+handleWalletRoutes(bot);
 
 // Error handling
 bot.on('polling_error', (error) => {

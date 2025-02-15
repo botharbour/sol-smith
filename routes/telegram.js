@@ -3,7 +3,17 @@ const handleTelegramRoutes = (bot) => {
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
         const username = msg.from.first_name;
-        bot.sendMessage(chatId, `Welcome ${username}! 👋\nType /help to see available commands.`);
+        
+        const options = {
+            reply_markup: {
+                inline_keyboard: [
+                    [{text: 'Create Solana Wallet', callback_data: 'create_wallet'}],
+                    [{text: 'View My Wallets', callback_data: 'view_wallets'}]
+                ]
+            }
+        };
+        
+        bot.sendMessage(chatId, `Welcome ${username}! 👋\nUse the buttons below to manage your Solana wallets.`, options);
     });
 
     // Help command
@@ -11,10 +21,10 @@ const handleTelegramRoutes = (bot) => {
         const chatId = msg.chat.id;
         const helpMessage = `
 Available commands:
-/start - Start the bot
+/start - Start the bot and show wallet options
 /help - Show this help message
 /time - Get current time
-/echo [message] - Echo back your message`;
+/wallet - Show wallet management options`;
         
         bot.sendMessage(chatId, helpMessage);
     });
@@ -26,19 +36,12 @@ Available commands:
         bot.sendMessage(chatId, `Current time: ${currentTime}`);
     });
 
-    // Echo command
-    bot.onText(/\/echo (.+)/, (msg, match) => {
-        const chatId = msg.chat.id;
-        const resp = match[1];
-        bot.sendMessage(chatId, resp);
-    });
-
     // Handle regular messages
     bot.on('message', (msg) => {
         const chatId = msg.chat.id;
         
-        // Only respond to non-command messages
-        if (!msg.text.startsWith('/')) {
+        // Only respond to non-command messages that don't start with /
+        if (msg.text && !msg.text.startsWith('/')) {
             bot.sendMessage(chatId, `You said: ${msg.text}`);
         }
     });
