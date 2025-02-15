@@ -1,7 +1,7 @@
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const moment = require('moment-timezone');
+const moment = require('moment');
 
 // Initialize data directories
 const DATA_DIR = './data';
@@ -37,17 +37,16 @@ const getUserData = (userId) => {
     return null;
 };
 
-// Helper function to initialize user data with timezone
+// Helper function to initialize user data
 const initializeUserData = (msg) => {
-    const timezone = msg.from.timezone || 'UTC'; // Default to UTC if no timezone provided
     return {
         userId: msg.from.id,
         username: msg.from.username || 'no_username',
         firstName: msg.from.first_name || '',
         lastName: msg.from.last_name || '',
         languageCode: msg.from.language_code || 'en',
-        createdAt: moment().tz(timezone).format(),
-        lastInteraction: moment().tz(timezone).format('YYYY-MM-DD HH:mm:ss z'),
+        createdAt: moment().utc().format('YYYY-MM-DD[T]HH:mm:ss[Z]'),
+        lastInteraction: moment().utc().format('YYYY-MM-DD HH:mm:ss [UTC]'),
         wallets: []
     };
 };
@@ -58,11 +57,10 @@ const handleWalletRoutes = (bot) => {
         const chatId = callbackQuery.message.chat.id;
         const userId = callbackQuery.from.id.toString();
         
-        // Update user's last interaction with timezone
+        // Update user's last interaction
         let userData = getUserData(userId);
         if (userData) {
-            const timezone = callbackQuery.from.timezone || 'UTC';
-            userData.lastInteraction = moment().tz(timezone).format('YYYY-MM-DD HH:mm:ss z');
+            userData.lastInteraction = moment().utc().format('YYYY-MM-DD HH:mm:ss [UTC]');
             saveUserData(userId, userData);
         }
 
@@ -130,16 +128,15 @@ const handleWalletRoutes = (bot) => {
                         const privateKey = fs.readFileSync(keyFile, 'utf8');
                         const publicKey = keyFile.replace('.json', '');
                         
-                        // Get or initialize user data with timezone
+                        // Get or initialize user data
                         let userData = getUserData(userId) || initializeUserData(msg);
-                        const timezone = msg.from.timezone || 'UTC';
-                        userData.lastInteraction = moment().tz(timezone).format('YYYY-MM-DD HH:mm:ss z');
+                        userData.lastInteraction = moment().utc().format('YYYY-MM-DD HH:mm:ss [UTC]');
 
                         // Add new wallet
                         userData.wallets.push({
                             privateKey,
                             publicKey: keyFile,
-                            createdAt: moment().tz(timezone).format()
+                            createdAt: moment().utc().format('YYYY-MM-DD[T]HH:mm:ss[Z]')
                         });
 
                         // Save updated user data
